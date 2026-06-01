@@ -1,0 +1,15 @@
+# ข้อมูลผู้ป่วย — ห้าม commit ขึ้น GitHub
+Sampled Dataset/
+
+# Local Claude Code settings
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
