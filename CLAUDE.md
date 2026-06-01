@@ -30,14 +30,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## โครงสร้าง Repository
 
+**GitHub remote:** `https://github.com/korat123/BDIHackathon`
+
 ```
 BDIHackathon/
-├── BDI-Young-Innovator_2026/                       # งาน EDA และไอเดียของทีม (sub-repo)
+├── BDI-Young-Innovator_2026/                       # งาน EDA + research ของทีม (regular files, ไม่ใช่ submodule)
+│   ├── idea7_ltfu_eda.ipynb                        # โน้ตบุ๊ค LTFU prediction หลัก (Idea 7)
 │   ├── healthcare_datathon_proposal_eda.ipynb      # โน้ตบุ๊ค EDA หลัก + ไอเดีย 6 แนวทาง
 │   ├── datathon_ideas_evaluation.md                # ไอเดียทั้งหมด 9 ข้อ + คะแนนจาก AI กรรมการ
+│   ├── LTFU_Compendium.md                          # คัมภีร์ Idea 7: clinical research, ML lit, citations ครบ
+│   ├── LTFUIdea.md                                 # EDA findings สำหรับ idea7_ltfu_eda.ipynb
 │   └── requirements.txt
+├── CompInfo/                                       # ไฟล์ทรัพยากรการแข่งขัน (slides, template, คู่มือ)
 └── Sampled Dataset/
-    └── bdi-hackathon-2026-sampled-dataset/         # ชุดข้อมูลตัวอย่าง (sub-repo, Git LFS)
+    └── bdi-hackathon-2026-sampled-dataset/         # git submodule → anonymaew/bdi-hackathon-2026-sampled-dataset (Git LFS)
         ├── diabetes/        # XLSX, ตัวอย่าง 100 จาก 70K คน
         ├── hypertension/    # XLSX, ตัวอย่าง 100 จาก 150K คน
         └── ventilator/      # CSV/JSON, 3 คนไข้ × ~30 เหตุการณ์
@@ -46,6 +52,13 @@ BDIHackathon/
 > `BDI-Young-Innovator_2026/` คืองาน data exploration ของทีม ไม่ใช่ production code — อ่านโน้ตบุ๊คและ `datathon_ideas_evaluation.md` ก่อนเริ่มพัฒนา
 
 `.gitignore` ใน `BDI-Young-Innovator_2026/` ตั้งใจไม่ commit โฟลเดอร์ `diabetes/`, `hypertension/`, `ventilator/` — ให้ copy ข้อมูลมาไว้ในเครื่องตัวเอง แต่ห้าม commit
+
+**Clone command สำหรับเพื่อนทีม:**
+```bash
+git clone --recurse-submodules https://github.com/korat123/BDIHackathon.git
+# ถ้า clone ไปแล้วแต่ลืม --recurse-submodules:
+git submodule update --init
+```
 
 ---
 
@@ -177,8 +190,30 @@ Diabetes subtypes: Type 1 ~2K, Type 2 ~50K, Unknown ~20K (จาก 70K ทั�
 
 - ชื่อคอลัมน์ในไฟล์ข้อมูลอาจเป็น **ภาษาไทย (UTF-8)** — อ่าน data dictionary (.xlsx) ในแต่ละโฟลเดอร์ก่อนเสมอ
 - `Sampled Dataset` sub-repo ใช้ **Git LFS** — ต้องรัน `git lfs pull` หลัง clone
-- มี `.git` สาม level (root, `BDI-Young-Innovator_2026/`, `Sampled Dataset/.../`) — ระวัง run git command ผิด directory
+- มี `.git` สอง level (root, `Sampled Dataset/.../`) — `BDI-Young-Innovator_2026/` เป็น regular files แล้ว ไม่มี `.git` ของตัวเอง
 - ชุดข้อมูลที่มีอยู่เป็น **ตัวอย่างเท่านั้น** ไม่ใช่ชุดข้อมูลเต็ม ทีมที่ผ่านรอบ proposal จะได้ชุดข้อมูลเต็ม
+
+---
+
+## ⚠️ Git Warning: คำสั่งที่ห้ามใช้ใน repo นี้
+
+**อย่าใช้ `git submodule deinit --force <path>` เด็ดขาด**
+
+คำสั่งนี้จะ **ลบไฟล์ทั้งหมดในโฟลเดอร์นั้น รวมถึงไฟล์ที่ยังไม่ได้ commit** (untracked files) โดยไม่มีการเตือน และไม่สามารถ recover ได้จาก git (เพราะไม่เคย commit)
+
+หากต้องการเปลี่ยน submodule เป็น regular files ให้ทำแบบนี้แทน:
+```bash
+# 1. ถอด submodule tracking ออกจาก index (ไม่แตะไฟล์)
+git rm --cached <path>
+# 2. ลบ .gitmodules entry ด้วยมือ
+# 3. ลบ .git ข้างใน (ถ้ามี) ด้วยมือ
+# 4. git add <path>/ เพื่อ track เป็น regular files
+```
+
+**Recovery command** (ถ้า deinit เกิดขึ้นแล้ว — กู้ได้เฉพาะ committed files เท่านั้น):
+```bash
+git --git-dir=".git/modules/<name>" show HEAD:<filename> > <destination>
+```
 
 ---
 
