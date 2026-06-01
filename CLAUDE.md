@@ -262,6 +262,41 @@ Pattern นี้ใช้แล้วใน `idea7_ltfu_eda.ipynb` และ `h
 
 ---
 
+## การรัน Notebook แบบ Headless (CLI)
+
+`jupyter` ไม่อยู่ใน PATH บนเครื่องนี้ — ต้องรันผ่าน `python -m jupyter`:
+
+```bash
+# รัน notebook และ capture output ทั้งหมด
+python -m jupyter nbconvert --to notebook --execute \
+  --output <output_path.ipynb> \
+  --ExecutePreprocessor.timeout=180 \
+  <input_notebook.ipynb>
+```
+
+ใช้สำหรับ: verify notebook รันครบโดยไม่มี error, capture output ก่อน commit
+
+---
+
+## ข้อควรระวัง: แก้ไขไฟล์ .ipynb
+
+ต้องใช้ **`NotebookEdit` tool** เท่านั้น — `Edit` tool จะ error ว่า "File is a Jupyter Notebook. Use the NotebookEdit to edit this file."
+
+`NotebookEdit` ใช้ `cell_id` (ไม่ใช่ cell index) ในการระบุ cell ที่ต้องการแก้
+
+---
+
+## ข้อมูลพฤติกรรม Sample Dataset (100 คน)
+
+**DM sample data quirk:** `max_consecutive_gap` min = 31 periods → clinical threshold = 3 ทำให้ LTFU = 100%
+
+แก้ไขแล้วใน `idea7_ltfu_eda.ipynb` Section 3 ด้วย **auto-detect threshold**:
+- ถ้า clinical threshold (3) ทำให้ทุกคนเป็น LTFU → ปรับเป็น `75th percentile + 1` อัตโนมัติ
+- ผลลัพธ์ใน sample: threshold = 62, Active = 76%, LTFU = 24%
+- Full dataset (70K คน): threshold 3 จะทำงานปกติ ไม่มี auto-adjust
+
+---
+
 ## Pattern: แยก Logic ออกเป็น .py ก่อน แล้ว Import เข้า Notebook
 
 VS Code Jupyter มีปัญหา output ไม่ตรงกัน — ไฟล์ `.py` จริงกับ cell ที่กำลังรันอยู่อาจแสดงผลคนละอย่าง เนื่องจาก notebook kernel cache code เวอร์ชันเก่าไว้
