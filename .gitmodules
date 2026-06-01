@@ -1,3 +1,3 @@
-[submodule "BDI-Young-Innovator_2026"]
-	path = BDI-Young-Innovator_2026
-	url = https://github.com/JEANTE2549/BDI-Young-Innovator_2026.git
+[submodule "Sampled Dataset/bdi-hackathon-2026-sampled-dataset"]
+	path = Sampled Dataset/bdi-hackathon-2026-sampled-dataset
+	url = https://github.com/anonymaew/bdi-hackathon-2026-sampled-dataset.git
