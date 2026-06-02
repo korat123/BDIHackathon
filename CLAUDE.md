@@ -26,6 +26,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > แบงค์, จีน, ข้าวฟาง, เฟิม จบจากโรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย และมีประสบการณ์แข่ง hackathon มาก่อน
 
+**หน้าที่ใน Proposal:**
+- **กอ** — Technical & AI Architect: เขียน `สถาปัตยกรรมและเทคโนโลยีที่ใช้` + ทำ Slide Presentation (เพื่อนอัดคลิป)
+- **จีน** — WORKFLOW diagram (`BDI-Young-Innovator_2026/Workflow Diagram(จีน).png`)
+- **ข้าวฟาง** — Product & Innovation Strategist
+- **ขฟ (แบงค์?)** — Business & Domain Lead (proposal(ขฟ).pdf)
+
 ---
 
 ## โครงสร้าง Repository
@@ -40,6 +46,10 @@ BDIHackathon/
 │   ├── datathon_ideas_evaluation.md                # ไอเดียทั้งหมด 9 ข้อ + คะแนนจาก AI กรรมการ
 │   ├── LTFU_Compendium.md                          # คัมภีร์ Idea 7: clinical research, ML lit, citations ครบ
 │   ├── LTFUIdea.md                                 # EDA findings สำหรับ idea7_ltfu_eda.ipynb
+│   ├── Propdetailed.md                             # ร่าง proposal ของแต่ละ role (technical section = กอ)
+│   ├── Workflow Diagram(จีน).png                   # System workflow diagram (จีนทำ)
+│   ├── Product & Innovation Strategist (สายนวัตกรรมและจุดขาย).pdf  # ข้าวฟางทำ
+│   ├── proposal(ขฟ).pdf                            # Business & Domain section
 │   └── requirements.txt
 ├── CompInfo/                                       # ไฟล์ทรัพยากรการแข่งขัน (slides, template, คู่มือ)
 └── Sampled Dataset/
@@ -146,8 +156,6 @@ Diabetes subtypes: Type 1 ~2K, Type 2 ~50K, Unknown ~20K (จาก 70K ทั�
 
 ### Idea 7: Patient Rescue Radar (คะแนน 126/130 — อันดับ 1)
 
-> **หมายเหตุ:** ไอเดียนี้อยู่ใน `datathon_ideas_evaluation.md` เท่านั้น ยังไม่ได้ถูกเพิ่มเข้าโน้ตบุ๊ค EDA
-
 **ปัญหา:**
 ผู้ป่วย NCD (เบาหวาน/ความดัน) ไม่รู้สึกเจ็บปวดในช่วงแรก → หยุดมาพบแพทย์ (Lost-to-Follow-Up: LTFU) → ความดัน/น้ำตาลกลับสูงกะทันหัน → หลอดเลือดแข็งตัว → **stroke/MI เฉียบพลัน** นี่คือสาเหตุหลักที่ผู้ป่วยต้องเข้า ICU แบบฉุกเฉิน ซึ่งป้องกันได้
 
@@ -161,6 +169,12 @@ Diabetes subtypes: Type 1 ~2K, Type 2 ~50K, Unknown ~20K (จาก 70K ทั�
 - Feasibility ใน 2 วัน — feature engineering + XGBoost ทำได้ทันที
 - Operational impact สูงสุด — เปลี่ยน AI จาก clinical analysis เป็น preventive healthcare operations
 - กรรมการประเมินว่าเป็น **Champion Idea อันดับ 1**
+
+**Dataset scope (implemented):** DM (70,000+ คน) + HT (150,000+ คน) = **220,000+ คนรวม**
+- HT dataset มี HbA1c (130 cols) และ FPG เหมือน DM → ใช้ feature pipeline เดียวกันได้ทันที
+- Pipeline: `df_combined = pd.concat([df_dm_features, df_ht_features])` พร้อม `disease_type` feature (0=DM, 1=HT)
+- Risk stratification: **High Risk ≥ 70** → Active Intervention (Case Manager + อสม.) / **Low Risk < 70** → Routine Care
+- Verified ด้วย sample 200 คน (DM 100 + HT 100) ใน `idea7_ltfu_eda.ipynb`
 
 ---
 
