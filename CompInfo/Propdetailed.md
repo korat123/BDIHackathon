@@ -36,86 +36,30 @@ Proposal
 
 ### เทคโนโลยีหลัก / อัลกอริทึม / โมเดล
 
-**Data Pipeline**
-- อ่านข้อมูล EMR รูปแบบ wide-format XLSX (4,190+ columns) ด้วย `pd.read_excel()` จาก sheet `data`
-- โครงสร้างข้อมูล: Period Index `P = -1` (ก่อนวินิจฉัย) → `P = 0` (วินิจฉัย) → `P ≥ 1` (ทุก 60 วัน)
-- ฐานข้อมูลผู้ป่วยเบาหวาน 70,000+ คน แบ่งเป็น 2 กลุ่ม: Active vs LTFU
+ระบบเริ่มจากการอ่านข้อมูล EMR ของผู้ป่วยเบาหวาน (70,000+ คน) ที่จัดเก็บในรูปแบบ XLSX wide-format ซึ่งมีคอลัมน์มากกว่า 4,000 ช่อง โดยแต่ละช่องแทนค่าตรวจวัดในช่วงเวลา (period) ต่างๆ นับจากวันวินิจฉัย
 
-**Feature Engineering (12 Features)**
+สิ่งที่ทำให้แนวทางนี้ต่างออกไปคือวิธีที่ทีมมองข้อมูลที่ "หายไป" ในระบบ EMR ของโรงพยาบาล ถ้าผู้ป่วยไม่มาพบแพทย์ ก็จะไม่มีการบันทึกค่าใดๆ เลย ดังนั้นช่องว่างในข้อมูลจึงไม่ใช่ข้อมูลเสีย แต่คือสัญญาณที่บ่งบอกว่าผู้ป่วยคนนั้นกำลังเริ่มหายออกจากระบบ ทีมจึงไม่เติมค่าเฉลี่ยลงไปเพื่อซ่อน pattern นั้น แต่เปลี่ยน pattern ของการหายไปให้กลายเป็น feature แทน
 
-| Feature | ความหมาย | แหล่งข้อมูล |
-|---------|---------|-----------|
-| `visit_frequency` | สัดส่วน periods ที่มีบันทึก vitalsign (= มาจริง) | `vitalsign_sbp_<P>` |
-| `max_consecutive_gap` | ช่วงขาดนัดต่อเนื่องยาวสุด (periods) | `vitalsign_sbp_<P>` |
-| `lab_sparsity_ratio` | สัดส่วน HbA1c periods ที่ missing | `lab_hba1c_<P>` |
-| `sbp_slope` | แนวโน้มความดันโลหิตข้ามเวลา | `vitalsign_sbp_<P>` |
-| `hba1c_slope` | แนวโน้มน้ำตาลในเลือดข้ามเวลา | `lab_hba1c_<P>` |
-| `sbp_at_last_visit` | ค่าความดัน ณ visit ล่าสุด | `vitalsign_sbp_<P>` |
-| `hba1c_at_baseline` | HbA1c ณ วันวินิจฉัย | `lab_hba1c_0` |
-| `last_observed_period` | Period ล่าสุดที่มีบันทึกข้อมูล | `vitalsign_sbp_<P>` |
-| `med_in_last_period` | รับยาต่อเนื่องในช่วงล่าสุดหรือไม่ | `med_*_<P>` |
-| `comorbidity_count` | จำนวนโรคร่วมที่บันทึก | `co_*_<P>` |
-| `age` | อายุผู้ป่วย | demographics |
-| `identify_by_enc` | วิธีวินิจฉัย (lab vs medication-based) | demographics |
+จาก insight นี้ ทีมสร้าง feature หลักสามกลุ่มจากข้อมูล EMR ที่มีอยู่
 
-**กลยุทธ์จัดการ Missing Data (MNAR)**
-- ข้อมูลที่หายไปใน EMR คือ **Missing Not At Random** — ผู้ป่วยไม่มา → ไม่มีบันทึก → missing = signal
-- ใช้ **Missing-Indicator Method**: ไม่ impute แต่เพิ่ม binary flag column ระบุตำแหน่งที่ missing
-- `visit_frequency` และ `lab_sparsity_ratio` encode ความถี่การขาดนัดเป็น feature โดยตรง
-- XGBoost รองรับ missing values natively — ไม่ต้องแปลงค่าเพิ่มเติม
+- **พฤติกรรมการมาพบแพทย์** — ดูว่าผู้ป่วยมาสม่ำเสมอแค่ไหน เคยหายไปต่อเนื่องนานสุดกี่เดือน และข้อมูลล่าสุดอยู่ที่ period ไหน ตัวเลขเหล่านี้บอกได้ตรงๆ ว่าผู้ป่วยห่างหายมากน้อยแค่ไหนก่อนที่จะถูกนับว่า LTFU
+- **แนวโน้มสุขภาพ** — ดูทิศทางของค่าความดันโลหิตและน้ำตาล HbA1c ข้ามเวลา ไม่ใช่แค่ค่าล่าสุด ผู้ป่วยที่ค่าแย่ลงต่อเนื่องแต่มาพบแพทย์น้อยลงเรื่อยๆ มีความเสี่ยงสูงมาก
+- **ความสม่ำเสมอในการรับยา** — ถ้าผู้ป่วยหยุดรับยาในช่วงปลาย มักตามมาด้วยการหายออกจากระบบในไม่ช้า
 
-**นิยาม LTFU (Label)**
-- LTFU = `max_consecutive_gap ≥ 3 periods` (≈ 6 เดือนต่อเนื่อง ไม่มีบันทึก visit)
-- อ้างอิง: Asante et al. 2025, Kalyesubula et al. 2019 (clinical consensus)
+ผู้ป่วยจะถูกนิยามว่า LTFU เมื่อขาดการบันทึก visit ต่อเนื่องอย่างน้อย 3 period (ประมาณ 6 เดือน) ซึ่งสอดคล้องกับ clinical consensus จากงานวิจัยในกลุ่มผู้ป่วย NCD
 
-**โมเดล: XGBoost Classifier**
-- `scale_pos_weight = n_active / n_ltfu` จัดการ class imbalance (LTFU มักน้อยกว่า Active)
-- Hyperparameter tuning ด้วย 5-fold stratified cross-validation
-- Baseline เปรียบเทียบ: Logistic Regression
-- เป้าหมาย AUROC ≥ 0.80 (อ้างอิงจาก analogous LTFU prediction studies)
+สำหรับโมเดล ทีมเลือก XGBoost เพราะรองรับข้อมูล missing ได้โดยตรงโดยไม่ต้องแปลงค่าล่วงหน้า และทำงานได้ดีบนข้อมูล EMR แบบตารางที่มีความ sparse สูง งานวิจัยที่คล้ายกันในการทำนาย LTFU ของผู้ป่วย HIV ทำได้ AUROC 85.9% ด้วย XGBoost ส่วน Neural Network ไม่เหมาะในบริบทนี้เพราะต้องการข้อมูลมากกว่าและใช้เวลา train นานเกินไปสำหรับการแข่งขัน 2 วัน
 
-**Explainability: SHAP**
-- คำนวณ SHAP values → ระบุ top 3 features ที่ขับเคลื่อน risk สำหรับคนไข้แต่ละราย
-- แปลงเป็นภาษาคลินิกสำหรับ Case Manager เช่น:
-  - "ไม่มาพบแพทย์ต่อเนื่อง 14 เดือน"
-  - "ไม่มีผล HbA1c ใน 2 ปีที่ผ่านมา"
-  - "ความดันครั้งล่าสุด 158 mmHg (Stage 2)"
+ผลลัพธ์ที่โมเดลให้ออกมาไม่ใช่แค่คะแนนตัวเลข ทีมใช้ SHAP เพื่อแปลผลออกมาเป็น 3 เหตุผลที่ Case Manager เข้าใจได้ เช่น "ไม่มาพบแพทย์ต่อเนื่อง 14 เดือน" หรือ "ความดันครั้งล่าสุด 158 mmHg และไม่มีบันทึกการรับยา" เพื่อให้ผู้ใช้งานตัดสินใจได้จริงโดยไม่ต้องเชื่อ black box
 
-**Libraries ที่ใช้**
-```
-pandas, numpy, scikit-learn, xgboost, shap, matplotlib, seaborn, openpyxl
-```
+เครื่องมือที่ใช้: Python, pandas, XGBoost, SHAP, scikit-learn
 
 ---
 
 ### แพลตฟอร์มและการ Deploy
 
-**Hackathon Prototype (2 วัน on-site)**
+สำหรับ Hackathon prototype ทีมพัฒนาใน Jupyter Notebook โดยเริ่มจากชุดข้อมูลตัวอย่าง 100 คน และจะ scale ขึ้นเป็น 70,000 คนเมื่อได้รับข้อมูลจริง output ของ prototype คือ risk score พร้อม SHAP summary plot และ patient risk card ต่อคน
 
-| องค์ประกอบ | รายละเอียด |
-|-----------|-----------|
-| Environment | Python 3.x + Jupyter Notebook / VS Code |
-| ข้อมูล | local XLSX — 100-row sample ระหว่างพัฒนา / 70K คนเมื่อผ่านรอบ |
-| Output | Risk score CSV + SHAP summary plot + Patient Risk Card (text) |
+สำหรับการใช้งานจริงในโรงพยาบาล ทีมออกแบบให้ระบบดึงข้อมูลจาก HIS ของโรงพยาบาลอัตโนมัติทุกคืน ประมวลผลผ่าน FastAPI backend แล้วแสดงผลบน Streamlit dashboard ที่ Case Manager สามารถเปิดดูรายชื่อผู้ป่วยเรียงตามระดับความเสี่ยง พร้อม 3 เหตุผลหลักต่อคนได้ทันที
 
-**Production Vision**
-
-```
-EMR / HIS (โรงพยาบาล)
-        ↓  batch pull ทุกคืน
-FastAPI Backend
-  → รัน feature pipeline + XGBoost inference + SHAP
-        ↓
-Streamlit Dashboard (Case Manager)
-  → Ranked list ผู้ป่วยเสี่ยงสูง + Risk Card (score + 3 เหตุผล)
-        ↓
-โทร / SMS ผู้ป่วย หรือส่ง อสม. เยี่ยมบ้าน
-```
-
-| องค์ประกอบ | เทคโนโลยี | เหตุผล |
-|-----------|----------|-------|
-| Backend API | FastAPI (Python) | เร็ว, async, รองรับ batch inference |
-| Dashboard | Streamlit | พัฒนาเร็ว, ใช้งานง่ายสำหรับ clinical staff |
-| Deployment | On-premise ที่โรงพยาบาล | ข้อมูลผู้ป่วยไม่ออกนอกระบบ (PDPA) |
-| EMR Integration | Internal REST API | เชื่อมต่อกับ HIS ที่มีอยู่โดยไม่ต้องเปลี่ยนระบบ |
-| Privacy | Output = risk score + 3 เหตุผล เท่านั้น | ไม่ expose raw medical records |
+เลือก deploy แบบ on-premise ที่โรงพยาบาลโดยตรง เพื่อให้ข้อมูลผู้ป่วยไม่ต้องออกไปยัง cloud ภายนอก ซึ่งสอดคล้องกับ พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA) ระบบส่งออกเพียง risk score และเหตุผล 3 ข้อ ไม่มีการส่งข้อมูลทางการแพทย์ดิบออกภายนอกใดๆ
