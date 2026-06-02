@@ -24,6 +24,8 @@
 | จำนวนผู้ป่วย (sample) | 100 คน (จาก ~150,000 คนจริง) |
 | จำนวน columns | 4,190 |
 | Period range | P = -63 ถึง P = 68 (132 periods รวม) |
+| **HbA1c columns** | **130 cols — มีเหมือน DM เพราะผู้ป่วย HT หลายคนมี DM ร่วม** |
+| **FPG columns** | **มีเหมือนกัน — feature pipeline เดียวกันใช้ได้กับทั้ง DM และ HT** |
 
 ### 1.3 Column Groups (DM dataset)
 | Group | จำนวน columns | ความหมาย |
@@ -139,17 +141,21 @@ Pattern ของ missingness บอก "story" ของผู้ป่วย:
 
 ## 7. Next Steps สำหรับ Onsite (2 วัน)
 
-### วันที่ 1 — Data Pipeline
-- [ ] โหลด full dataset (DM 70K + HT 150K)
-- [ ] รัน `idea7_ltfu_eda.ipynb` ตั้งแต่ต้น
-- [ ] ตรวจสอบ LTFU threshold — คาดว่า distribution จะ balance กว่า
-- [ ] เพิ่ม features: DBP slope, medication change pattern
+> **อัปเดต 3 มิ.ย. 2569:** Pipeline ขยายรองรับ **DM + HT combined** แล้ว  
+> ยืนยันแล้วว่า HT dataset มี HbA1c (130 cols) และ FPG เหมือน DM → feature pipeline เดิมใช้ได้ทันที  
+> Notebook `idea7_ltfu_eda.ipynb` ทดสอบบน combined 200 คน (DM 100 + HT 100) — รันผ่านทุก step
+
+### วันที่ 1 — Data Pipeline (เริ่มจาก notebook ที่เตรียมไว้แล้ว)
+- [ ] โหลด full dataset (DM 70K + HT 150K = 220K+ คน)
+- [ ] รัน `idea7_ltfu_eda.ipynb` ตั้งแต่ต้น — pipeline จะ combine DM+HT อัตโนมัติ
+- [ ] ตรวจสอบ LTFU threshold สำหรับ full data (threshold 3 จะทำงานปกติ ไม่ต้อง auto-adjust)
+- [ ] ดู class balance จริงใน 220K คน และ tune `scale_pos_weight` ตามสัดส่วนจริง
 
 ### วันที่ 2 — Model & Presentation
-- [ ] Train XGBoost กับ full dataset
-- [ ] Cross-validate (Stratified 5-Fold)
-- [ ] SHAP analysis → เลือก top 5 features
-- [ ] สร้าง output: risk score table สำหรับ Case Manager
+- [ ] Train XGBoost บน full 220K คน (Section 6 รันได้เลย)
+- [ ] Cross-validate (Stratified 5-Fold) → target AUROC ≥ 0.80
+- [ ] SHAP analysis → ตีความ top features แยกตาม DM / HT
+- [ ] สร้าง output: risk score table + patient risk card สำหรับ Case Manager
 - [ ] เตรียม pitch: "3 เหตุผลหลักที่ผู้ป่วยคนนี้เสี่ยง" ภาษาคลินิก
 
 ---
