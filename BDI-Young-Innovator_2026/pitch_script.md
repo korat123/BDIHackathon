@@ -78,19 +78,60 @@ STROKE / หัวใจล้มเหลว / ไตวาย
 
 ### Slide 5 — นวัตกรรม: จุดที่ต่างจากระบบอื่น
 
-**Main Message:** เราเห็นสิ่งที่ระบบอื่นมองข้าม
+**Main Message:** เราอาศัยข้อมูลที่ระบบอื่นทิ้งทุกวัน
 
-**"Wow Factor" — ความแตกต่าง:**
+---
 
-| ระบบทั่วไป | Patient Rescue Radar |
-|-----------|---------------------|
-| ใช้ค่าตรวจวัดเท่านั้น | **ใช้ "ช่องว่าง" ในข้อมูลเป็น signal หลัก** |
-| Black box — ไม่อธิบายเหตุผล | **SHAP อธิบาย "ทำไม" เป็นภาษาคลินิก** |
-| ต้องการ infrastructure ใหม่ | **ใช้ EMR ที่มีอยู่แล้ว ไม่ต้องลงทุน** |
-| รู้ปัญหาหลัง event | **รู้ล่วงหน้า — ป้องกันก่อนเกิด** |
+**ทำไมระบบเดิมล้มเหลว — 3 ข้อเท็จจริง:**
 
-**Academic Backing:**
-> งานวิจัย Sperrin et al. (JMIR 2021) และ Nijman et al. (JMIR 2025) ยืนยันว่า การนำ missingness indicators เข้าเป็น feature ช่วยเพิ่มประสิทธิภาพโมเดล clinical AI ได้อย่างมีนัยสำคัญ
+1. **ไม่มี ML-based LTFU system สำหรับ NCD ในไทย** — ปัจจุบันใช้ manual scheduling และโทรหาผู้ป่วยทุกคนโดยไม่มี risk stratification
+2. **Gap rule อย่างเดียวไม่พอ** — การ flag แบบง่ายๆ ว่า "ไม่มาเกิน 6 เดือน = LTFU" มี AUC เพียง ~0.65 หมายความว่าคาดผิดถึง 35% ของกรณี
+3. **ไม่ scale** — Case Manager 1 คนดูแลผู้ป่วยได้แค่ ~200–300 คน/เดือน ถ้าต้องโทรหาทุกคนคือเป็นไปไม่ได้
+
+---
+
+**3 นวัตกรรมที่แท้จริง — พร้อมหลักฐานวิชาการ:**
+
+**① MNAR as Feature — ข้อมูลที่หายไปคือข้อมูลที่สำคัญที่สุด**
+
+ข้อมูล EMR ของเราหายไป 80–90% ในส่วน lab — ซึ่งไม่ใช่ random noise แต่คือ **MNAR (Missing Not At Random)**: ผู้ป่วยไม่มา → ไม่มีค่าบันทึก → ช่องว่างนั้นคือ signal
+
+ระบบทั่วไปเห็น missing data → impute ด้วย mean/median → ทำลาย signal ที่สำคัญที่สุดทิ้ง
+
+เราทำ: ใช้ `lab_sparsity_ratio`, `max_consecutive_gap`, `visit_frequency` เป็น **top features** ของโมเดล
+
+> **หลักฐาน:** Sperrin et al. (JMIR Med Inform 2021) พบว่า missing vitals ใน ICU เป็น early warning signal ที่ improve AUC; Nijman et al. (JMIR 2025) review 50+ papers สรุปว่า "including missingness indicators **consistently improves** model performance"
+
+**② SHAP → Clinical Language — Actionable ไม่ใช่แค่ Explainable**
+
+ระบบ ML ทั่วไป: ให้ SHAP plot → แพทย์งงว่าต้องอ่านยังไง
+
+เราแปล SHAP values → **"3 ประโยคภาษาคลินิก"** ที่ Case Manager อ่านแล้ว act ได้ทันทีโดยไม่ต้องตีความ
+
+> **หลักฐาน:** npj Digital Medicine 2025 (doi:10.1038/s41746-025-01958-8) พบว่า SHAP plot ดิบๆ ยังยากสำหรับแพทย์ — วิธีที่ดีกว่าคือแปลเป็นภาษาธรรมชาติ + ระดับความรุนแรง ซึ่งเป็นสิ่งที่เราทำ
+
+**③ Cost Asymmetry — ทำไม precision 50% ก็คุ้มค่า**
+
+| ประเภทข้อผิดพลาด | ต้นทุน |
+|-----------------|--------|
+| False Positive (โทรหาคนที่ไม่ LTFU จริง) | เสียเวลา Case Manager **5 นาที** |
+| False Negative (พลาดคน LTFU จริง) | ICU **200,000–500,000 บาท** |
+
+→ Asymmetry นี้ทำให้ active monitoring คุ้มค่าแม้จะมี precision ต่ำ และ justify ROI 134× ของระบบ
+
+---
+
+**Performance Benchmark — เปรียบเทียบกับ baseline:**
+
+| โมเดล | AUC คาดหวัง | หมายเหตุ |
+|-------|------------|---------|
+| Gap threshold (naive, ≥6 เดือน) | ~0.65 | วิธีที่ใช้อยู่ในปัจจุบัน |
+| Logistic Regression | ~0.72–0.78 | clinical ML standard |
+| **XGBoost + MNAR features (เรา)** | **≥ 0.80** | เป้าหมายตาม literature |
+
+**Analogous proof ที่ใกล้เคียงที่สุด:**
+> Azmeraw et al. (BMC Medical Informatics 2025) ทำนาย LTFU ใน HIV/ART **115,000+ คน** ด้วย XGBoost + visit pattern features ได้ AUROC **85.9%** (95% CI: 82.0–89.6)
+> → เราใช้ approach เดียวกัน แต่กับ NCD dataset ของไทยที่ใหญ่กว่า (220K+ คน)
 
 ---
 
